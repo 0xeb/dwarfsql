@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Options
-option(DWARFSQL_WITH_AI_AGENT "Enable AI agent support" OFF)
+option(DWARFSQL_WITH_AI_AGENT "Enable AI agent support" ON)
 option(DWARFSQL_BUILD_TESTS "Build tests" ON)
 
 # Output directories (only if standalone build)

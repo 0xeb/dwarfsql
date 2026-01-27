@@ -1,0 +1,192 @@
+name: build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*", "V*"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================================
+  # Build (Cross-platform)
+  # ============================================================================
+  build-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libelf-dev
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Upload CLI
+        uses: actions/upload-artifact@v4
+        with:
+          name: dwarfsql-linux
+          path: build/bin/dwarfsql
+
+  build-macos:
+    name: Build (macOS)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Upload CLI
+        uses: actions/upload-artifact@v4
+        with:
+          name: dwarfsql-macos
+          path: build/bin/dwarfsql
+
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: cmake -B build
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Upload CLI
+        uses: actions/upload-artifact@v4
+        with:
+          name: dwarfsql-windows
+          path: build/bin/Release/dwarfsql.exe
+
+  # ============================================================================
+  # Tests
+  # ============================================================================
+  tests:
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Linux
+            runner: ubuntu-latest
+          - os: macOS
+            runner: macos-latest
+          - os: Windows
+            runner: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libelf-dev
+
+      - name: Check if tests directory exists
+        id: check_tests
+        shell: bash
+        run: |
+          if [ -d "tests" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Tests directory not found - skipping (tests may be in xsql monorepo)"
+          fi
+
+      - name: Configure
+        if: steps.check_tests.outputs.exists == 'true'
+        shell: bash
+        working-directory: tests
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        if: steps.check_tests.outputs.exists == 'true'
+        shell: bash
+        working-directory: tests
+        run: cmake --build build --config Release
+
+      - name: Test
+        if: steps.check_tests.outputs.exists == 'true'
+        shell: bash
+        working-directory: tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  # ============================================================================
+  # Release
+  # ============================================================================
+  publish-release:
+    name: Publish Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build-linux, build-macos, build-windows, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dwarfsql-linux
+          path: dwarfsql-linux
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dwarfsql-macos
+          path: dwarfsql-macos
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dwarfsql-windows
+          path: dwarfsql-windows
+
+      - name: Prepare release
+        run: |
+          mkdir -p release
+          cp dwarfsql-linux/dwarfsql release/dwarfsql-linux || true
+          cp dwarfsql-macos/dwarfsql release/dwarfsql-macos || true
+          cp dwarfsql-windows/dwarfsql.exe release/dwarfsql.exe || true
+          chmod +x release/dwarfsql-linux release/dwarfsql-macos 2>/dev/null || true
+          ls -la release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: DWARFSQL ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release/dwarfsql-linux
+            release/dwarfsql-macos
+            release/dwarfsql.exe
