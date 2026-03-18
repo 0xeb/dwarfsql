@@ -104,24 +104,19 @@ find_library(LIBELF_LIBRARY
 if(DWARFSQL_WITH_AI_AGENT)
     if(TARGET libagents)
         message(STATUS "dwarfsql: Using libagents from parent project")
-    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../idasql/external/libagents/CMakeLists.txt")
-        set(LIBAGENTS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-        set(LIBAGENTS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-        set(LIBAGENTS_BUILD_CLI OFF CACHE BOOL "" FORCE)
-        set(LIBAGENTS_BUILD_COPILOT ON CACHE BOOL "" FORCE)
-        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../idasql/external/libagents
-                         ${CMAKE_CURRENT_BINARY_DIR}/libagents)
-        message(STATUS "dwarfsql: Added libagents from idasql/external")
-    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/libagents/CMakeLists.txt")
-        set(LIBAGENTS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-        set(LIBAGENTS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-        set(LIBAGENTS_BUILD_CLI OFF CACHE BOOL "" FORCE)
-        set(LIBAGENTS_BUILD_COPILOT ON CACHE BOOL "" FORCE)
-        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/external/libagents)
-        message(STATUS "dwarfsql: Added libagents from external submodule")
     else()
-        message(WARNING "libagents not found, disabling AI agent support")
-        set(DWARFSQL_WITH_AI_AGENT OFF)
+        message(STATUS "dwarfsql: Fetching libagents from GitHub...")
+        set(LIBAGENTS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        set(LIBAGENTS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+        set(LIBAGENTS_BUILD_CLI OFF CACHE BOOL "" FORCE)
+        set(LIBAGENTS_BUILD_COPILOT ON CACHE BOOL "" FORCE)
+        include(FetchContent)
+        FetchContent_Declare(libagents
+            GIT_REPOSITORY https://github.com/0xeb/libagents.git
+            GIT_TAG        main
+            GIT_SHALLOW    TRUE
+        )
+        FetchContent_MakeAvailable(libagents)
     endif()
 endif()
 
@@ -201,16 +196,6 @@ if(DWARFSQL_WITH_AI_AGENT)
     add_dependencies(dwarfsql dwarfsql_embed_prompt)
     target_link_libraries(dwarfsql PRIVATE libagents::libagents fastmcpp_core)
     target_compile_definitions(dwarfsql PRIVATE DWARFSQL_HAS_AI_AGENT)
-    # fastmcpp headers
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../idasql/external/libagents/external/fastmcpp/include")
-        target_include_directories(dwarfsql PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/../idasql/external/libagents/external/fastmcpp/include
-        )
-    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/libagents/external/fastmcpp/include")
-        target_include_directories(dwarfsql PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/external/libagents/external/fastmcpp/include
-        )
-    endif()
 endif()
 
 if(DWARFSQL_WITH_HTTP)
