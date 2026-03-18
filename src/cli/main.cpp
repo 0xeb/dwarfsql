@@ -4,10 +4,8 @@
  * Usage:
  *   dwarfsql <binary> "SELECT * FROM functions"    # Query mode
  *   dwarfsql <binary> -i                           # Interactive mode
- *   dwarfsql <binary> --server [port]              # Server mode
  *   dwarfsql <binary> --http [port]                # HTTP REST server
  *   dwarfsql <binary> --mcp [port]                 # MCP server
- *   dwarfsql --remote host:port -q "..."           # Remote client mode
  */
 
 // Windows SDK compatibility - must be before any includes
@@ -23,9 +21,6 @@
 #include <dwarfsql/dwarfsql.hpp>
 #include <dwarfsql_commands.hpp>
 #include <xsql/database.hpp>
-#include <xsql/socket/server.hpp>
-#include <xsql/socket/client.hpp>
-#include <xsql/socket/protocol.hpp>
 #include <xsql/json.hpp>
 
 #ifdef DWARFSQL_HAS_HTTP
@@ -69,16 +64,12 @@ void print_usage() {
               << "Usage:\n"
               << "  dwarfsql <binary> \"<query>\"       Execute query and exit\n"
               << "  dwarfsql <binary> -i              Interactive mode\n"
-              << "  dwarfsql <binary> --server [port] Start TCP server (default port: "
-              << dwarfsql::DEFAULT_PORT << ")\n"
-              << "  dwarfsql --remote host:port -q \"<query>\"  Remote query\n"
-              << "  dwarfsql --remote host:port -i   Remote interactive\n\n"
+              << "  dwarfsql <binary> --http [port]  HTTP REST server\n"
+              << "  dwarfsql <binary> --mcp [port]   MCP server\n\n"
               << "Options:\n"
               << "  -s, --source <path> Binary file path (alternative to positional)\n"
               << "  -i, --interactive   Interactive REPL mode\n"
               << "  -q, --query <sql>   Execute query\n"
-              << "  --server [port]     Start server mode\n"
-              << "  --remote host:port  Connect to remote server\n"
 #ifdef DWARFSQL_HAS_HTTP
               << "  --http [port]       Start HTTP REST server (default: 8080)\n"
 #endif
@@ -102,7 +93,6 @@ void print_usage() {
               << "Examples:\n"
               << "  dwarfsql a.out \"SELECT name, low_pc FROM functions LIMIT 10\"\n"
               << "  dwarfsql a.out -i\n"
-              << "  dwarfsql a.out --server 17199\n"
 #ifdef DWARFSQL_HAS_HTTP
               << "  dwarfsql a.out --http 8080\n"
 #endif
@@ -212,44 +202,6 @@ std::string execute_query_json(xsql::Database& db, const std::string& sql) {
     return j.dump();
 }
 
-// Convert xsql::Result to xsql::socket::QueryResult for server mode
-xsql::socket::QueryResult execute_query_for_server(xsql::Database& db, const std::string& sql) {
-    auto result = db.query(sql);
-
-    xsql::socket::QueryResult qr;
-    if (!result.ok()) {
-        qr.success = false;
-        qr.error = result.error;
-        return qr;
-    }
-
-    qr.success = true;
-    qr.columns = result.columns;
-    for (const auto& row : result.rows) {
-        qr.rows.push_back(row.values);
-    }
-    return qr;
-}
-
-void print_remote_result(const xsql::socket::RemoteResult& qr) {
-    if (!qr.success) {
-        std::cout << "Error: " << qr.error << "\n";
-        return;
-    }
-
-    if (qr.rows.empty() && qr.columns.empty()) {
-        std::cout << "OK\n";
-        return;
-    }
-
-    TablePrinter printer;
-    printer.set_columns(qr.columns);
-    for (const auto& row : qr.rows) {
-        printer.add_row(row.values);
-    }
-    printer.print(std::cout);
-}
-
 void run_interactive(xsql::Database& db, const std::string& binary_path, bool verbose) {
     dwarfsql::CommandCallbacks callbacks;
     callbacks.get_tables = [&db]() {
@@ -335,22 +287,6 @@ void run_interactive(xsql::Database& db, const std::string& binary_path, bool ve
 #ifdef DWARFSQL_HAS_AI_AGENT
     g_agent = nullptr;
 #endif
-}
-
-bool parse_host_port(const std::string& spec, std::string& host, int& port) {
-    auto colon = spec.rfind(':');
-    if (colon == std::string::npos) {
-        host = spec;
-        port = dwarfsql::DEFAULT_PORT;
-        return true;
-    }
-    host = spec.substr(0, colon);
-    try {
-        port = std::stoi(spec.substr(colon + 1));
-        return port > 0 && port <= 65535;
-    } catch (...) {
-        return false;
-    }
 }
 
 //=============================================================================
@@ -476,14 +412,11 @@ int main(int argc, char* argv[]) {
     // Parse arguments
     std::string binary_path;
     std::string query;
-    std::string remote_host;
     std::string token;
     std::string bind_addr;
-    int server_port = 0;
     int http_port = 8080;
     int mcp_port = 0;  // 0 = random
     bool interactive = false;
-    bool server_mode = false;
     bool http_mode = false;
     bool mcp_mode = false;
     bool verbose = false;
@@ -501,17 +434,6 @@ int main(int argc, char* argv[]) {
         } else if (arg == "-q" || arg == "--query") {
             if (i + 1 < argc) {
                 query = argv[++i];
-            }
-        } else if (arg == "--server") {
-            server_mode = true;
-            if (i + 1 < argc && argv[i + 1][0] != '-') {
-                server_port = std::stoi(argv[++i]);
-            } else {
-                server_port = dwarfsql::DEFAULT_PORT;
-            }
-        } else if (arg == "--remote") {
-            if (i + 1 < argc) {
-                remote_host = argv[++i];
             }
         } else if (arg == "--token") {
             if (i + 1 < argc) {
@@ -540,45 +462,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Remote mode
-    if (!remote_host.empty()) {
-        std::string host;
-        int port;
-        if (!parse_host_port(remote_host, host, port)) {
-            std::cerr << "Error: Invalid remote address: " << remote_host << "\n";
-            return 1;
-        }
-
-        xsql::socket::Client client;
-        if (!token.empty()) {
-            client.set_auth_token(token);
-        }
-        if (!client.connect(host, port)) {
-            std::cerr << "Error: " << client.error() << "\n";
-            return 1;
-        }
-
-        if (interactive) {
-            std::cout << "dwarfsql - Remote interactive mode\n"
-                      << "Connected to: " << host << ":" << port << "\n"
-                      << "Type .quit to exit\n\n";
-
-            std::string line;
-            while (std::cout << "dwarfsql> " << std::flush && std::getline(std::cin, line)) {
-                if (line == ".quit" || line == ".exit") break;
-                if (line.empty()) continue;
-
-                auto result = client.query(line);
-                print_remote_result(result);
-            }
-        } else if (!query.empty()) {
-            auto result = client.query(query);
-            print_remote_result(result);
-            return result.success ? 0 : 1;
-        }
-        return 0;
-    }
-
     // Local mode - need binary path
     if (binary_path.empty()) {
         std::cerr << "Error: Binary path required\n";
@@ -602,26 +485,6 @@ int main(int argc, char* argv[]) {
 #ifndef _WIN32
     std::signal(SIGTERM, signal_handler);
 #endif
-
-    // Server mode
-    if (server_mode) {
-        xsql::socket::ServerConfig cfg;
-        cfg.port = server_port;
-        if (!token.empty()) {
-            cfg.auth_token = token;
-        }
-
-        xsql::socket::Server server(cfg);
-        server.set_query_handler([&db](const std::string& sql) {
-            return execute_query_for_server(db, sql);
-        });
-
-        std::cout << "dwarfsql server listening on port " << server_port << "\n"
-                  << "Binary: " << binary_path << "\n"
-                  << "Press Ctrl-C to stop.\n";
-        server.run();
-        return 0;
-    }
 
 #ifdef DWARFSQL_HAS_HTTP
     // HTTP server mode

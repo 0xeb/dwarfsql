@@ -332,20 +332,3 @@ curl http://localhost:8081/status
 {"success": false, "error": "no such table: bad_table"}
 ```
 
----
-
-### Raw TCP Server (Legacy)
-
-Binary protocol with length-prefixed JSON. Use only when HTTP is not available.
-
-**Starting the server:**
-```bash
-dwarfsql binary.elf --server 13337
-dwarfsql binary.elf --server 13337 --token mysecret
-```
-
-**Connecting as client:**
-```bash
-dwarfsql --remote localhost:13337 -q "SELECT name FROM functions LIMIT 5"
-dwarfsql --remote localhost:13337 -i
-```

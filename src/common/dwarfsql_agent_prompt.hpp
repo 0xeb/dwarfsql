@@ -1,5 +1,5 @@
 // Auto-generated from dwarfsql_agent.md
-// Generated: 2026-01-28T09:09:59.470179
+// Generated: 2026-02-19T06:05:03.567920
 // DO NOT EDIT - regenerate with: python scripts/embed_prompt.py
 
 #pragma once
@@ -105,7 +105,7 @@ Function parameters with type and location information.
 - `func_id` (INTEGER): Foreign key to functions
 - `name` (TEXT): Parameter name
 - `type` (TEXT): Parameter type name
-- `index` (INTEGER): Parameter position (0-based)
+- `param_index` (INTEGER): Parameter position (0-based)
 - `location` (TEXT): Location expression (register, stack offset)
 
 ### local_variables
@@ -341,23 +341,6 @@ curl http://localhost:8081/status
 {"success": false, "error": "no such table: bad_table"}
 ```
 
----
-
-### Raw TCP Server (Legacy)
-
-Binary protocol with length-prefixed JSON. Use only when HTTP is not available.
-
-**Starting the server:**
-```bash
-dwarfsql binary.elf --server 13337
-dwarfsql binary.elf --server 13337 --token mysecret
-```
-
-**Connecting as client:**
-```bash
-dwarfsql --remote localhost:13337 -q "SELECT name FROM functions LIMIT 5"
-dwarfsql --remote localhost:13337 -i
-```
 )PROMPT";
 
 } // namespace dwarfsql

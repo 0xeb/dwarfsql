@@ -15,17 +15,11 @@ dwarfsql a.out "SELECT name, low_pc, high_pc FROM functions LIMIT 10"
 # Interactive mode
 dwarfsql a.out -i
 
-# Server mode (TCP)
-dwarfsql a.out --server 17199
-
 # HTTP REST server
 dwarfsql a.out --http 8080
 
 # MCP server (for Claude Desktop / AI tools)
 dwarfsql a.out --mcp 9000
-
-# Remote client
-dwarfsql --remote localhost:17199 -q "SELECT * FROM compilation_units"
 ```
 
 ## Tables
@@ -137,7 +131,7 @@ dnf install libdwarf-devel elfutils-libelf-devel
 ### Build
 
 ```bash
-# From monorepo root
+# From a parent project root
 cmake -B build -DBUILD_WITH_DWARFSQL=ON
 cmake --build build
 
@@ -160,20 +154,15 @@ cmake --build build
 Usage:
   dwarfsql <binary> "<query>"       Execute query and exit
   dwarfsql <binary> -i              Interactive mode
-  dwarfsql <binary> --server [port] Start TCP server (default: 17199)
   dwarfsql <binary> --http [port]   Start HTTP REST server (default: 8080)
   dwarfsql <binary> --mcp [port]    Start MCP server (default: random 9000-9999)
-  dwarfsql --remote host:port -q    Remote query
-  dwarfsql --remote host:port -i    Remote interactive
 
 Options:
   -i, --interactive   Interactive REPL mode
   -q, --query <sql>   Execute query
-  --server [port]     Start TCP server mode
   --http [port]       Start HTTP REST server
   --mcp [port]        Start MCP server (Model Context Protocol)
   --bind <addr>       Bind address (default: 127.0.0.1)
-  --remote host:port  Connect to remote server
   --token <token>     Authentication token
   -v, --verbose       Verbose output
   -h, --help          Show help

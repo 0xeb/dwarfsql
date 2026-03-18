@@ -34,7 +34,7 @@ if(TARGET xsql::xsql)
     message(STATUS "dwarfsql: Using xsql::xsql from parent project")
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../libxsql/CMakeLists.txt")
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../libxsql ${CMAKE_CURRENT_BINARY_DIR}/libxsql)
-    message(STATUS "dwarfsql: Added libxsql from monorepo")
+    message(STATUS "dwarfsql: Added libxsql from sibling directory")
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/libxsql/CMakeLists.txt")
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/external/libxsql)
     message(STATUS "dwarfsql: Added libxsql from external submodule")
@@ -42,7 +42,7 @@ else()
     find_package(xsql QUIET)
     if(NOT xsql_FOUND)
         message(FATAL_ERROR "libxsql not found. Options:\n"
-            "  1. Build as part of xsql monorepo\n"
+            "  1. Build from a parent project that already provides libxsql\n"
             "  2. Add as submodule: git submodule add ../libxsql external/libxsql\n"
             "  3. Install libxsql and use find_package(xsql)")
     endif()
