@@ -18,7 +18,7 @@
 
 namespace dwarfsql {
 
-constexpr const char* VERSION = "0.1.0";
+constexpr const char* VERSION = "0.0.1";
 constexpr int DEFAULT_PORT = 17199;
 
 } // namespace dwarfsql

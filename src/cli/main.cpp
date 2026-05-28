@@ -29,6 +29,7 @@
 #include <dwarfsql_commands.hpp>
 #include <xsql/database.hpp>
 #include <xsql/json.hpp>
+#include <xsql/query_script.hpp>
 
 #ifdef DWARFSQL_HAS_HTTP
 #include "http_server.hpp"
@@ -168,45 +169,16 @@ private:
 };
 
 std::string execute_query(xsql::Database& db, const std::string& sql) {
-    auto result = db.query(sql);
-    if (!result.ok()) {
-        return "Error: " + result.error;
+    auto script = xsql::run_database_script(db, sql, {});
+    if (!script.parse_error.empty()) {
+        return "Parse error: " + script.parse_error;
     }
-
-    if (result.empty()) {
-        return "(no results)";
-    }
-
-    TablePrinter printer;
-    printer.set_columns(result.columns);
-
-    for (const auto& row : result.rows) {
-        printer.add_row(row.values);
-    }
-
-    return printer.to_string();
+    return xsql::script_result_to_text(script);
 }
 
 std::string execute_query_json(xsql::Database& db, const std::string& sql) {
-    auto result = db.query(sql);
-    xsql::json j;
-
-    if (result.ok()) {
-        j["success"] = true;
-        j["columns"] = result.columns;
-
-        auto& rows = j["rows"];
-        rows = xsql::json::array();
-        for (const auto& row : result.rows) {
-            rows.push_back(row.values);
-        }
-        j["row_count"] = result.rows.size();
-    } else {
-        j["success"] = false;
-        j["error"] = result.error;
-    }
-
-    return j.dump();
+    auto script = xsql::run_database_script(db, sql, {});
+    return xsql::script_result_to_json(script);
 }
 
 void run_interactive(xsql::Database& db, const std::string& binary_path, bool verbose) {
