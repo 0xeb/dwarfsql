@@ -155,6 +155,12 @@ C++ namespace definitions.
 3. **Filter Early**: Use WHERE clauses to narrow results.
 4. **Limit Results**: Use LIMIT when exploring to avoid overwhelming output.
 
+## Aggregates (libxsql built-in)
+
+`blob_concat(value)` concatenates BLOB inputs and INTEGER 0-255 values
+into one BLOB. NULL inputs are skipped; TEXT or out-of-range INTs error.
+Use over an ordered row source.
+
 ## Example Queries
 
 ### Find largest functions

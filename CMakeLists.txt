@@ -3,11 +3,17 @@
 # Build: cmake -B build && cmake --build build
 
 cmake_minimum_required(VERSION 3.20)
-project(dwarfsql VERSION 0.0.1 LANGUAGES C CXX)
+project(dwarfsql VERSION 0.0.2 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Windows VERSIONINFO wiring (version is from project() above; no-op on non-Windows)
+set(TOOL_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(TOOL_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(TOOL_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/versioninfo.cmake)
 
 # Options
 option(DWARFSQL_WITH_AI_AGENT "Enable AI agent support" ON)
@@ -184,6 +190,12 @@ if(DWARFSQL_WITH_HTTP)
 endif()
 
 add_executable(dwarfsql ${DWARFSQL_CLI_SOURCES})
+
+# Windows VS_VERSION_INFO resource (no-op on non-Windows)
+xsql_add_versioninfo(dwarfsql
+    FILETYPE          VFT_APP
+    DESCRIPTION       "dwarfsql command-line interface for DWARF debug info"
+    ORIGINAL_FILENAME "dwarfsql.exe")
 
 target_include_directories(dwarfsql PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/include

@@ -1,12 +1,5 @@
-// Copyright (c) 2024-2026 Elias Bachaalany
-// SPDX-License-Identifier: MPL-2.0
-//
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
 // Auto-generated from dwarfsql_agent.md
-// Generated: 2026-02-19T06:05:03.567920
+// Generated: 2026-05-31T20:49:11.583454
 // DO NOT EDIT - regenerate with: python scripts/embed_prompt.py
 
 #pragma once
@@ -170,6 +163,12 @@ C++ namespace definitions.
 2. **Use JOINs**: Link tables using their foreign key relationships.
 3. **Filter Early**: Use WHERE clauses to narrow results.
 4. **Limit Results**: Use LIMIT when exploring to avoid overwhelming output.
+
+## Aggregates (libxsql built-in)
+
+`blob_concat(value)` concatenates BLOB inputs and INTEGER 0-255 values
+into one BLOB. NULL inputs are skipped; TEXT or out-of-range INTs error.
+Use over an ordered row source.
 
 ## Example Queries
 
@@ -340,13 +339,24 @@ curl http://localhost:8081/status
 ```
 
 **Response Format (JSON):**
-```json
-{"success": true, "columns": ["name", "low_pc"], "rows": [["main", "4096"]], "row_count": 1}
-```
+
+All `/query` responses use the canonical script envelope — single statement = array of one entry:
 
 ```json
-{"success": false, "error": "no such table: bad_table"}
+{
+  "success": true,
+  "statement_count": <N>,
+  "results": [
+    { "statement_index": 0, "success": true, "columns": [...], "rows": [...],
+      "row_count": <N>, "elapsed_ms": <ms>, "error": null }
+  ],
+  "row_count_total": <N>,
+  "elapsed_ms_total": <ms>,
+  "first_error_index": null
+}
 ```
+
+Bodies can be multi-statement (semicolon-separated); each `results[i]` has its own `columns`/`rows`/`row_count`/`error`. Fail-fast is the default; pass `?continue_on_error=1` to run every statement regardless of earlier failures. On splitter failure (e.g. unterminated quote) the response is `success:false`, `statement_count:0`, `results:[]`, plus a top-level `parse_error`.
 
 )PROMPT";
 
