@@ -76,34 +76,19 @@ ORDER BY address DESC
 LIMIT 1;
 ```
 
-## AI Agent Mode
+## Using dwarfsql with an AI agent
 
-With AI agent support, you can query in natural language:
+dwarfsql is a plain SQL CLI — it does **not** embed or run its own AI agent. To let an
+external agent or LLM (Claude, Copilot, or any assistant) drive dwarfsql, point it at the
+tool two ways:
 
-```
-dwarfsql> Find all functions that start with 'init'
-dwarfsql> What are the largest structures?
-dwarfsql> Show me the enum values for error codes
-```
-
-### Prerequisites for AI Features
-
-The AI agent requires one of these CLI tools installed and authenticated:
-
-| Provider | CLI Tool | Install | Login |
-|----------|----------|---------|-------|
-| Claude (default) | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` | Run `claude`, then `/login` |
-| GitHub Copilot | [Copilot CLI](https://github.com/features/copilot/cli/) | `npm install -g @github/copilot` | Run `copilot`, then `/login` |
-
-**Important:** You must be logged in before using AI features.
-
-### Provider Configuration
-
-```
-.agent provider claude    # or copilot
-.agent byok enable
-.agent byok key sk-your-key
-```
+- **As a system prompt:** feed [`prompts/dwarfsql_agent.md`](prompts/dwarfsql_agent.md) to
+  your model as its system/instruction prompt. It documents the full SQL schema, every
+  table and column, and worked query patterns, so the model can translate
+  natural-language questions into dwarfsql SQL and run them via `-q` / `--http` / `--mcp`.
+- **Over MCP:** start `dwarfsql <binary> --mcp` and connect any MCP client (see MCP Server
+  below). The client's own model does the reasoning; dwarfsql exposes the `dwarfsql_query`
+  tool that executes SQL against the DWARF info.
 
 ## Building
 
@@ -133,10 +118,6 @@ dnf install libdwarf-devel elfutils-libelf-devel
 ```bash
 # From a parent project root
 cmake -B build -DBUILD_WITH_DWARFSQL=ON
-cmake --build build
-
-# With AI agent support
-cmake -B build -DBUILD_WITH_DWARFSQL=ON -DDWARFSQL_WITH_AI_AGENT=ON
 cmake --build build
 ```
 
@@ -224,7 +205,6 @@ Add to Claude Desktop config:
 
 Available MCP tools:
 - `dwarfsql_query` - Execute SQL queries directly
-- `dwarfsql_agent` - Ask natural language questions (requires AI agent build)
 
 ## REPL Commands
 
@@ -235,10 +215,6 @@ Available MCP tools:
 .clear          Clear session
 .quit / .exit   Exit
 .help           Show help
-
-.agent help     AI agent commands
-.agent provider Show/set provider
-.agent byok     BYOK configuration
 ```
 
 ## The xsql family
@@ -265,6 +241,14 @@ query you learn against one tool largely carries over to the others.
 
 Elias Bachaalany ([@0xeb](https://github.com/0xeb))
 
-## License
+## License and Terms of Use
 
-This project is licensed under the [Mozilla Public License 2.0](LICENSE).
+In short: you may read, build, evaluate, benchmark, package, and use unmodified dwarfsql, including commercially, if you preserve notices and follow the license terms. You may fork or patch it to prepare bug fixes, optimizations, features, tests, or documentation improvements for contribution back within the license's contribution-purpose rules.
+
+You may not maintain a divergent private fork, port, rebrand, clone, API-compatible replacement, competing implementation, or use dwarfsql as AI input to recreate or improve a derivative implementation without prior written permission from Elias Bachaalany. Independent implementations that are not copied from, materially derived from, or substantially informed by dwarfsql in the license's defined sense are not prohibited.
+
+Permission requests: open a GitHub issue at [0xeb/dwarfsql/issues](https://github.com/0xeb/dwarfsql/issues).
+
+If dwarfsql materially informs a distributed project, preserve the human origin: credit dwarfsql and Elias Bachaalany visibly in your README/docs and in About/credits UI when applicable. The license includes an examples/FAQ section for common allowed and permission-required uses. Third-party dependencies (libxsql, libdwarf/libelf, and their transitive dependencies) remain under their own licenses.
+
+See the full [Human-Origin Source License v1.0](LICENSE).

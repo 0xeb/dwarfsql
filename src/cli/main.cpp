@@ -1,9 +1,8 @@
 // Copyright (c) 2024-2026 Elias Bachaalany
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: LicenseRef-Human-Origin-Source-1.0
 //
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// This file is licensed under the Human-Origin Source License v1.0.
+// See LICENSE.
 
 /**
  * dwarfsql CLI - Query DWARF debug information with SQL
@@ -35,8 +34,7 @@
 #include "http_server.hpp"
 #endif
 
-#ifdef DWARFSQL_HAS_AI_AGENT
-#include "ai_agent.hpp"
+#ifdef DWARFSQL_HAS_MCP
 #include "mcp_server.hpp"
 #endif
 
@@ -53,22 +51,15 @@
 namespace {
 
 // Global for signal handling
-#ifdef DWARFSQL_HAS_AI_AGENT
-dwarfsql::AIAgent* g_agent = nullptr;
-#endif
 volatile sig_atomic_t g_quit_requested = 0;
 
 void signal_handler(int /*sig*/) {
     g_quit_requested = 1;
-#ifdef DWARFSQL_HAS_AI_AGENT
-    if (g_agent) {
-        g_agent->request_quit();
-    }
-#endif
 }
 
 void print_usage() {
-    std::cout << "dwarfsql v" << dwarfsql::VERSION << " - SQL interface to DWARF debug information\n\n"
+    std::cout << "dwarfsql v" << dwarfsql::VERSION << " - SQL interface to DWARF debug information\n"
+              << dwarfsql::COPYRIGHT << "\n\n"
               << "Usage:\n"
               << "  dwarfsql <binary> \"<query>\"       Execute query and exit\n"
               << "  dwarfsql <binary> -i              Interactive mode\n"
@@ -81,7 +72,7 @@ void print_usage() {
 #ifdef DWARFSQL_HAS_HTTP
               << "  --http [port]       Start HTTP REST server (default: 8080)\n"
 #endif
-#ifdef DWARFSQL_HAS_AI_AGENT
+#ifdef DWARFSQL_HAS_MCP
               << "  --mcp [port]        Start MCP server (default: random 9000-9999)\n"
 #endif
               << "  --bind <addr>       Bind address for server (default: 127.0.0.1)\n"
@@ -104,7 +95,7 @@ void print_usage() {
 #ifdef DWARFSQL_HAS_HTTP
               << "  dwarfsql a.out --http 8080\n"
 #endif
-#ifdef DWARFSQL_HAS_AI_AGENT
+#ifdef DWARFSQL_HAS_MCP
               << "  dwarfsql a.out --mcp 9000\n"
 #endif
               ;
@@ -196,28 +187,16 @@ void run_interactive(xsql::Database& db, const std::string& binary_path, bool ve
         return std::string("Table not found: ") + table;
     };
     callbacks.get_info = [&binary_path]() {
-        return "DWARFSQL v" + std::string(dwarfsql::VERSION) + "\nBinary: " + binary_path;
+        return "DWARFSQL v" + std::string(dwarfsql::VERSION) + "\n" + dwarfsql::COPYRIGHT + "\nBinary: " + binary_path;
     };
     callbacks.clear_session = []() {
-#ifdef DWARFSQL_HAS_AI_AGENT
-        if (g_agent) {
-            g_agent->reset_session();
-        }
-#endif
         return "Session cleared";
     };
 
-#ifdef DWARFSQL_HAS_AI_AGENT
-    auto settings = dwarfsql::LoadAgentSettings();
-    auto executor = [&db](const std::string& sql) { return execute_query(db, sql); };
-    dwarfsql::AIAgent agent(executor, settings, verbose);
-    g_agent = &agent;
-    agent.load_byok_from_env();
-#else
     (void)verbose;
-#endif
 
     std::cout << "dwarfsql v" << dwarfsql::VERSION << " - Interactive mode\n"
+              << dwarfsql::COPYRIGHT << "\n"
               << "Binary: " << binary_path << "\n"
               << "Type .help for commands, .clear to reset, .quit to exit\n\n";
 
@@ -246,26 +225,10 @@ void run_interactive(xsql::Database& db, const std::string& binary_path, bool ve
                 std::cout << output << "\n";
             }
         } else {
-            // Not a command - execute as query or send to agent
-#ifdef DWARFSQL_HAS_AI_AGENT
-            if (!dwarfsql::AIAgent::looks_like_sql(line)) {
-                // Natural language query
-                std::string response = agent.query(line);
-                if (!response.empty()) {
-                    std::cout << response << std::endl;
-                }
-            } else {
-                std::cout << execute_query(db, line) << "\n";
-            }
-#else
+            // Not a command - execute as SQL query
             std::cout << execute_query(db, line) << "\n";
-#endif
         }
     }
-
-#ifdef DWARFSQL_HAS_AI_AGENT
-    g_agent = nullptr;
-#endif
 }
 
 //=============================================================================
@@ -321,35 +284,24 @@ static int run_http_mode(xsql::Database& db, const std::string& binary_path,
 // MCP Server Mode
 //=============================================================================
 
-#ifdef DWARFSQL_HAS_AI_AGENT
+#ifdef DWARFSQL_HAS_MCP
 static dwarfsql::DwarfsqlMCPServer* g_mcp_server = nullptr;
 
 static void mcp_signal_handler(int) {
     if (g_mcp_server) g_mcp_server->stop();
 }
 
+// Serve the direct-SQL dwarfsql_query MCP tool over SSE until Ctrl+C.
 static int run_mcp_mode(xsql::Database& db, const std::string& binary_path,
-                        int port, const std::string& bind_addr, bool verbose) {
-    // Create agent for natural language queries
-    auto settings = dwarfsql::LoadAgentSettings();
-    auto executor = [&db](const std::string& sql) { return execute_query(db, sql); };
-    dwarfsql::AIAgent agent(executor, settings, verbose);
-    agent.load_byok_from_env();
-
-    // Query callback returns formatted text
+                        int port, const std::string& bind_addr) {
     auto query_cb = [&db](const std::string& sql) -> std::string {
-        return execute_query(db, sql);
-    };
-
-    // Ask callback for natural language
-    auto ask_cb = [&agent](const std::string& question) -> std::string {
-        return agent.query(question);
+        return execute_query_json(db, sql);
     };
 
     dwarfsql::DwarfsqlMCPServer server;
     g_mcp_server = &server;
 
-    int actual_port = server.start(port, query_cb, ask_cb,
+    int actual_port = server.start(port, query_cb,
                                     bind_addr.empty() ? "127.0.0.1" : bind_addr, false);
     if (actual_port < 0) {
         std::cerr << "Error: Failed to start MCP server\n";
@@ -361,7 +313,7 @@ static int run_mcp_mode(xsql::Database& db, const std::string& binary_path,
     auto old_term_handler = std::signal(SIGTERM, mcp_signal_handler);
 #endif
 
-    std::cout << dwarfsql::format_mcp_info(actual_port, true);
+    std::cout << dwarfsql::format_mcp_info(actual_port);
     std::cout << "\nBinary: " << binary_path << "\n";
     std::cout << "Press Ctrl+C to stop.\n\n";
 
@@ -378,7 +330,7 @@ static int run_mcp_mode(xsql::Database& db, const std::string& binary_path,
     std::cout << "\nMCP server stopped.\n";
     return 0;
 }
-#endif // DWARFSQL_HAS_AI_AGENT
+#endif // DWARFSQL_HAS_MCP
 
 } // anonymous namespace
 
@@ -477,14 +429,14 @@ int main(int argc, char* argv[]) {
     }
 #endif
 
-#ifdef DWARFSQL_HAS_AI_AGENT
+#ifdef DWARFSQL_HAS_MCP
     // MCP server mode
     if (mcp_mode) {
-        return run_mcp_mode(db, binary_path, mcp_port, bind_addr, verbose);
+        return run_mcp_mode(db, binary_path, mcp_port, bind_addr);
     }
 #else
     if (mcp_mode) {
-        std::cerr << "Error: MCP mode not available. Rebuild with -DDWARFSQL_WITH_AI_AGENT=ON\n";
+        std::cerr << "Error: MCP mode not available. Rebuild with -DDWARFSQL_WITH_MCP=ON\n";
         return 1;
     }
 #endif

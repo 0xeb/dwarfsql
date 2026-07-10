@@ -1,9 +1,17 @@
+#
+# Copyright (c) 2024-2026 Elias Bachaalany
+# SPDX-License-Identifier: LicenseRef-Human-Origin-Source-1.0
+#
+# This file is licensed under the Human-Origin Source License v1.0.
+# See LICENSE.
+#
+
 # dwarfsql - SQL interface to DWARF debug information
 #
 # Build: cmake -B build && cmake --build build
 
 cmake_minimum_required(VERSION 3.20)
-project(dwarfsql VERSION 0.0.2 LANGUAGES C CXX)
+project(dwarfsql VERSION 0.0.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,8 +24,8 @@ set(TOOL_VERSION_PATCH ${PROJECT_VERSION_PATCH})
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/versioninfo.cmake)
 
 # Options
-option(DWARFSQL_WITH_AI_AGENT "Enable AI agent support" ON)
 option(DWARFSQL_WITH_HTTP "Build with HTTP REST server support" ON)
+option(DWARFSQL_WITH_MCP "Build with MCP server support (fastmcpp)" ON)
 
 # HTTP support requires thinclient from libxsql
 if(DWARFSQL_WITH_HTTP)
@@ -104,44 +112,29 @@ find_library(LIBELF_LIBRARY
 )
 
 # ============================================================================
-# libagents (optional AI agent support)
+# MCP support (optional, uses fastmcpp)
 # ============================================================================
 
-if(DWARFSQL_WITH_AI_AGENT)
-    if(TARGET libagents)
-        message(STATUS "dwarfsql: Using libagents from parent project")
-    else()
-        message(STATUS "dwarfsql: Fetching libagents from GitHub...")
-        set(LIBAGENTS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-        set(LIBAGENTS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-        set(LIBAGENTS_BUILD_CLI OFF CACHE BOOL "" FORCE)
-        set(LIBAGENTS_BUILD_COPILOT ON CACHE BOOL "" FORCE)
+if(DWARFSQL_WITH_MCP)
+    message(STATUS "dwarfsql: Building with MCP support via fastmcpp")
+    if(NOT TARGET fastmcpp_core)
+        set(FASTMCPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        set(FASTMCPP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+        set(FASTMCPP_ENABLE_POST_STREAMING OFF CACHE BOOL "" FORCE)
+        set(FASTMCPP_ENABLE_SAMPLING_HTTP_HANDLERS OFF CACHE BOOL "" FORCE)
+        set(FASTMCPP_FETCH_CURL OFF CACHE BOOL "" FORCE)
+        message(STATUS "dwarfsql: Fetching fastmcpp from GitHub...")
         include(FetchContent)
-        FetchContent_Declare(libagents
-            GIT_REPOSITORY https://github.com/0xeb/libagents.git
+        FetchContent_Declare(fastmcpp
+            GIT_REPOSITORY https://github.com/0xeb/fastmcpp.git
             GIT_TAG        main
             GIT_SHALLOW    TRUE
         )
-        FetchContent_MakeAvailable(libagents)
+        FetchContent_MakeAvailable(fastmcpp)
     endif()
-endif()
-
-# ============================================================================
-# Embed system prompt (if AI agent enabled)
-# ============================================================================
-
-if(DWARFSQL_WITH_AI_AGENT)
-    set(PROMPT_MD "${CMAKE_CURRENT_SOURCE_DIR}/prompts/dwarfsql_agent.md")
-    set(PROMPT_HPP "${CMAKE_CURRENT_SOURCE_DIR}/src/common/dwarfsql_agent_prompt.hpp")
-    add_custom_command(
-        OUTPUT ${PROMPT_HPP}
-        COMMAND ${CMAKE_COMMAND} -E env python3 "${CMAKE_CURRENT_SOURCE_DIR}/scripts/embed_prompt.py"
-                "${PROMPT_MD}" "${PROMPT_HPP}"
-        DEPENDS ${PROMPT_MD}
-        COMMENT "Embedding dwarfsql_agent.md into dwarfsql_agent_prompt.hpp"
-        VERBATIM
-    )
-    add_custom_target(dwarfsql_embed_prompt DEPENDS ${PROMPT_HPP})
+    if(MSVC AND TARGET fastmcpp_core)
+        target_compile_options(fastmcpp_core PRIVATE /MP)
+    endif()
 endif()
 
 # ============================================================================
@@ -178,9 +171,8 @@ target_compile_features(dwarfsql_lib PUBLIC cxx_std_17)
 
 set(DWARFSQL_CLI_SOURCES src/cli/main.cpp)
 
-if(DWARFSQL_WITH_AI_AGENT)
+if(DWARFSQL_WITH_MCP)
     list(APPEND DWARFSQL_CLI_SOURCES
-        src/common/ai_agent.cpp
         src/common/mcp_server.cpp
     )
 endif()
@@ -204,10 +196,9 @@ target_include_directories(dwarfsql PRIVATE
 
 target_link_libraries(dwarfsql PRIVATE dwarfsql_lib)
 
-if(DWARFSQL_WITH_AI_AGENT)
-    add_dependencies(dwarfsql dwarfsql_embed_prompt)
-    target_link_libraries(dwarfsql PRIVATE libagents::libagents fastmcpp_core)
-    target_compile_definitions(dwarfsql PRIVATE DWARFSQL_HAS_AI_AGENT)
+if(DWARFSQL_WITH_MCP)
+    target_link_libraries(dwarfsql PRIVATE fastmcpp_core)
+    target_compile_definitions(dwarfsql PRIVATE DWARFSQL_HAS_MCP)
 endif()
 
 if(DWARFSQL_WITH_HTTP)
