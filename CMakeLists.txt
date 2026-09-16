@@ -70,13 +70,31 @@ if(PkgConfig_FOUND)
 endif()
 
 if(NOT LIBDWARF_FOUND)
-    # Try to find libdwarf manually
+    # Locate the directory that CONTAINS libdwarf.h, not its parent.
+    #
+    # Distributions disagree on the layout, and the difference is not something
+    # an -I flag can paper over:
+    #
+    #   Debian/Ubuntu   /usr/include/libdwarf/libdwarf.h
+    #   Homebrew, Fedora, upstream source installs
+    #                   <prefix>/include/libdwarf-N/libdwarf.h   (N = ABI major)
+    #
+    # Asking for `libdwarf/libdwarf.h` only matches the Debian layout and yields
+    # the PARENT dir, which forces sources to spell `#include <libdwarf/...>`.
+    # That include then cannot resolve anywhere else -- the reason the macOS CI
+    # build failed continuously and was marked continue-on-error rather than
+    # fixed. PATH_SUFFIXES makes the search layout-agnostic and returns the
+    # directory holding the headers, so sources include <libdwarf.h> plainly and
+    # every platform resolves it.
     find_path(LIBDWARF_INCLUDE_DIR
-        NAMES libdwarf/libdwarf.h dwarf.h libdwarf.h
+        NAMES libdwarf.h
+        PATH_SUFFIXES
+            libdwarf libdwarf-0 libdwarf-1 libdwarf-2
         PATHS
             /usr/include
             /usr/local/include
             /opt/homebrew/include
+            /opt/homebrew/opt/libdwarf/include
             ${CMAKE_CURRENT_SOURCE_DIR}/external/libdwarf/include
     )
 

@@ -22,8 +22,8 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
-#include <libdwarf/libdwarf.h>
-#include <libdwarf/dwarf.h>
+#include <libdwarf.h>
+#include <dwarf.h>
 #endif
 
 namespace dwarfsql {
