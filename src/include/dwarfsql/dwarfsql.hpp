@@ -17,7 +17,7 @@
 
 namespace dwarfsql {
 
-constexpr const char* VERSION = "0.0.3";
+constexpr const char* VERSION = "0.0.4";
 constexpr const char* COPYRIGHT = "Copyright (c) 2024-2026 Elias Bachaalany";
 constexpr int DEFAULT_PORT = 17199;
 
