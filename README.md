@@ -1,5 +1,12 @@
 # dwarfsql
 
+<p align="center">
+  <a href="https://github.com/0xeb/dwarfsql/releases/latest"><img alt="Download dwarfsql" src="https://img.shields.io/badge/Download-dwarfsql-1e6fd9?style=for-the-badge"></a>
+  <a href="https://paypal.me/EliasBachaalany"><img alt="Donate with PayPal" src="https://img.shields.io/badge/Donate-PayPal-0070e0?style=for-the-badge&logo=paypal&logoColor=white"></a>
+  <a href="https://buymeacoffee.com/0xeb"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black"></a>
+  <a href="https://github.com/0xeb/dwarfsql"><img alt="Star dwarfsql on GitHub" src="https://img.shields.io/github/stars/0xeb/dwarfsql?style=for-the-badge&logo=github&label=Star&color=24292f"></a>
+</p>
+
 SQL interface to DWARF debug information via SQLite virtual tables.
 
 ## Overview
@@ -236,6 +243,18 @@ query you learn against one tool largely carries over to the others.
 **Core**
 - **[libxsql](https://github.com/0xeb/libxsql)** — the C++ SQLite virtual-table
   framework every tool above is built on.
+
+## Support
+
+If dwarfsql saves you time, a donation funds the next release, and a star helps others find it.
+
+<p>
+  <a href="https://paypal.me/EliasBachaalany"><img alt="Donate with PayPal" src="https://img.shields.io/badge/Donate-PayPal-0070e0?style=for-the-badge&logo=paypal&logoColor=white"></a>
+  <a href="https://buymeacoffee.com/0xeb"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black"></a>
+  <a href="https://github.com/0xeb/dwarfsql"><img alt="Star dwarfsql on GitHub" src="https://img.shields.io/github/stars/0xeb/dwarfsql?style=for-the-badge&logo=github&label=Star&color=24292f"></a>
+</p>
+
+Bug reports with a minimal reproduction are just as valuable.
 
 ## Author
 
