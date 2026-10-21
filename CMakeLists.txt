@@ -66,7 +66,10 @@ endif()
 
 find_package(PkgConfig QUIET)
 if(PkgConfig_FOUND)
-    pkg_check_modules(LIBDWARF QUIET libdwarf)
+    pkg_check_modules(LIBDWARF QUIET IMPORTED_TARGET libdwarf)
+    if(LIBDWARF_FOUND)
+        set(LIBDWARF_LIBRARIES PkgConfig::LIBDWARF)
+    endif()
 endif()
 
 if(NOT LIBDWARF_FOUND)
