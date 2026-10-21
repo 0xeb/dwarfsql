@@ -165,12 +165,11 @@ uint64_t get_die_ref(Dwarf_Debug dbg, Dwarf_Die die, Dwarf_Half attr) {
     }
 
     Dwarf_Off off;
-    // Try CU-relative ref first, then global ref
-    if (dwarf_formref(at, &off, &err) != DW_DLV_OK) {
-        if (dwarf_global_formref(at, &off, &err) != DW_DLV_OK) {
-            dwarf_dealloc_attribute(at);
-            return 0;
-        }
+    // Consumers resolve these with dwarf_offdie_b(), which needs a section
+    // offset. A CU-relative offset can identify an unrelated DIE in another CU.
+    if (dwarf_global_formref(at, &off, &err) != DW_DLV_OK) {
+        dwarf_dealloc_attribute(at);
+        return 0;
     }
 
     dwarf_dealloc_attribute(at);
@@ -406,7 +405,11 @@ bool DwarfSession::open(const std::string& path) {
     Dwarf_Error err = nullptr;
     unsigned int group_number = DW_GROUPNUMBER_ANY;
 
+#ifdef DW_DLC_READ
     int res = dwarf_init_b(fd_, DW_DLC_READ, group_number, nullptr, nullptr, &dbg_, &err);
+#else
+    int res = dwarf_init_b(fd_, group_number, nullptr, nullptr, &dbg_, &err);
+#endif
 
     if (res == DW_DLV_NO_ENTRY) {
         last_error_ = "No DWARF debug info found in: " + path;
@@ -438,8 +441,12 @@ bool DwarfSession::open(const std::string& path) {
 void DwarfSession::close() {
 #ifdef DWARFSQL_HAS_LIBDWARF
     if (dbg_) {
+#ifdef DW_DLC_READ
         Dwarf_Error err = nullptr;
         dwarf_finish(dbg_, &err);
+#else
+        dwarf_finish(dbg_);
+#endif
         dbg_ = nullptr;
     }
     if (fd_ >= 0) {
