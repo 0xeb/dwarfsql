@@ -35,9 +35,12 @@ public:
     DwarfsqlHTTPServer(const DwarfsqlHTTPServer&) = delete;
     DwarfsqlHTTPServer& operator=(const DwarfsqlHTTPServer&) = delete;
 
+    // A non-empty auth_token makes every route except GET / and GET /help
+    // require `Authorization: Bearer <token>` (or X-XSQL-Token).
     int start(int port, HTTPQueryCallback query_cb,
               const std::string& bind_addr = "127.0.0.1",
-              bool use_queue = false);
+              bool use_queue = false,
+              const std::string& auth_token = "");
 
     void run_until_stopped();
     void stop();
@@ -52,7 +55,7 @@ private:
     std::unique_ptr<xsql::thinclient::http_query_server> impl_;
 };
 
-std::string format_http_info(int port);
+std::string format_http_info(int port, const std::string& bind_addr);
 std::string format_http_status(int port, bool running);
 
 } // namespace dwarfsql

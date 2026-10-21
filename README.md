@@ -170,7 +170,7 @@ When started with `--http`, dwarfsql exposes a REST API:
 
 Example:
 ```bash
-curl -X POST http://localhost:8080/query -d "SELECT name FROM functions LIMIT 5"
+curl -X POST http://localhost:8080/query --data-binary "SELECT name FROM functions LIMIT 5"
 ```
 
 Response format — all `/query` responses use the canonical script envelope (single statement = array of one entry):

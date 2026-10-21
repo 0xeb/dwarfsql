@@ -42,13 +42,19 @@ Response Format:
   Success: {"success": true, "columns": [...], "rows": [[...]], "row_count": N}
   Error:   {"success": false, "error": "message"}
 
+Authentication (if enabled with --token):
+  Header: Authorization: Bearer <token>
+  Or:     X-XSQL-Token: <token>
+  GET / and GET /help never need it.
+
 Example:
   curl http://localhost:<port>/help
-  curl -X POST http://localhost:<port>/query -d "SELECT name FROM functions LIMIT 5"
+  curl -X POST http://localhost:<port>/query --data-binary "SELECT name FROM functions LIMIT 5"
 )";
 
 int DwarfsqlHTTPServer::start(int port, HTTPQueryCallback query_cb,
-                              const std::string& bind_addr, bool use_queue) {
+                              const std::string& bind_addr, bool use_queue,
+                              const std::string& auth_token) {
     if (impl_ && impl_->is_running()) {
         return impl_->port();
     }
@@ -58,6 +64,7 @@ int DwarfsqlHTTPServer::start(int port, HTTPQueryCallback query_cb,
     config.help_text = HTTP_HELP_TEXT;
     config.port = port;
     config.bind_address = bind_addr;
+    config.auth_token = auth_token;
     config.query_fn = std::move(query_cb);
     config.use_queue = use_queue;
     config.status_fn = []() {
@@ -83,8 +90,10 @@ void DwarfsqlHTTPServer::set_interrupt_check(std::function<bool()> check) {
     if (impl_) impl_->set_interrupt_check(std::move(check));
 }
 
-std::string format_http_info(int port) {
-    return xsql::thinclient::format_http_info("dwarfsql", port);
+std::string format_http_info(int port, const std::string& bind_addr) {
+    return xsql::thinclient::format_http_info("dwarfsql", port, bind_addr,
+                                              "Press Ctrl+C to stop.",
+                                              /*cancel_supported=*/false);
 }
 
 std::string format_http_status(int port, bool running) {

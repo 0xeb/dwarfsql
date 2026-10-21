@@ -243,7 +243,8 @@ static void http_signal_handler(int) {
 }
 
 static int run_http_mode(xsql::Database& db, const std::string& binary_path,
-                         int port, const std::string& bind_addr) {
+                         int port, const std::string& bind_addr,
+                         const std::string& auth_token) {
     auto query_cb = [&db](const std::string& sql) -> std::string {
         return execute_query_json(db, sql);
     };
@@ -251,7 +252,8 @@ static int run_http_mode(xsql::Database& db, const std::string& binary_path,
     dwarfsql::DwarfsqlHTTPServer server;
     g_http_server = &server;
 
-    int actual_port = server.start(port, query_cb, bind_addr.empty() ? "127.0.0.1" : bind_addr, false);
+    const std::string actual_bind = bind_addr.empty() ? "127.0.0.1" : bind_addr;
+    int actual_port = server.start(port, query_cb, actual_bind, false, auth_token);
     if (actual_port < 0) {
         std::cerr << "Error: Failed to start HTTP server\n";
         return 1;
@@ -262,7 +264,11 @@ static int run_http_mode(xsql::Database& db, const std::string& binary_path,
     auto old_term_handler = std::signal(SIGTERM, http_signal_handler);
 #endif
 
-    std::cout << dwarfsql::format_http_info(actual_port);
+    std::cout << dwarfsql::format_http_info(actual_port, actual_bind);
+    if (!auth_token.empty()) {
+        std::cout << "Auth: send -H \"Authorization: Bearer <token>\" with every request "
+                     "except GET / and GET /help.\n";
+    }
     std::cout << "Binary: " << binary_path << "\n\n";
 
     // Wait for shutdown
@@ -301,8 +307,8 @@ static int run_mcp_mode(xsql::Database& db, const std::string& binary_path,
     dwarfsql::DwarfsqlMCPServer server;
     g_mcp_server = &server;
 
-    int actual_port = server.start(port, query_cb,
-                                    bind_addr.empty() ? "127.0.0.1" : bind_addr, false);
+    const std::string actual_bind = bind_addr.empty() ? "127.0.0.1" : bind_addr;
+    int actual_port = server.start(port, query_cb, actual_bind, false);
     if (actual_port < 0) {
         std::cerr << "Error: Failed to start MCP server\n";
         return 1;
@@ -313,9 +319,10 @@ static int run_mcp_mode(xsql::Database& db, const std::string& binary_path,
     auto old_term_handler = std::signal(SIGTERM, mcp_signal_handler);
 #endif
 
-    std::cout << dwarfsql::format_mcp_info(actual_port);
+    std::cout << dwarfsql::format_mcp_info(actual_port, actual_bind);
     std::cout << "\nBinary: " << binary_path << "\n";
     std::cout << "Press Ctrl+C to stop.\n\n";
+    std::cout.flush();  // the banner must reach a redirected stdout now, not at exit
 
     // Wait for shutdown
     while (server.is_running()) {
@@ -420,7 +427,7 @@ int main(int argc, char* argv[]) {
 #ifdef DWARFSQL_HAS_HTTP
     // HTTP server mode
     if (http_mode) {
-        return run_http_mode(db, binary_path, http_port, bind_addr);
+        return run_http_mode(db, binary_path, http_port, bind_addr, token);
     }
 #else
     if (http_mode) {

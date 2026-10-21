@@ -318,7 +318,7 @@ dwarfsql binary.elf --http 8081 --token mysecret
 curl http://localhost:8081/help
 
 # Execute SQL query
-curl -X POST http://localhost:8081/query -d "SELECT name, low_pc FROM functions LIMIT 5"
+curl -X POST http://localhost:8081/query --data-binary "SELECT name, low_pc FROM functions LIMIT 5"
 
 # With authentication
 curl -X POST http://localhost:8081/query \
